@@ -1,0 +1,35 @@
+{
+  "name": "ladygg",
+  "version": "1.0.0",
+  "description": "Simple, stupid gRPC client for Node written in Typescript",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -w -p tsconfig.json",
+    "test": "ts-node ./tests/test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stepci/ladygg.git"
+  },
+  "keywords": [
+    "grpc",
+    "client"
+  ],
+  "author": "Mish Ushakov <mish@stepci.com>",
+  "license": "MPL-2.0",
+  "bugs": {
+    "url": "https://github.com/stepci/ladygg/issues"
+  },
+  "homepage": "https://github.com/stepci",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.7.1",
+    "protobufjs": "^7.1.2"
+  },
+  "devDependencies": {
+    "@tsconfig/node16": "^1.0.3",
+    "@types/node": "^18.7.18",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.3"
+  }
+}
