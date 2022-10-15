@@ -1,15 +1,15 @@
-# ladygg
+# lady-gg
 
 Simple, stupid gRPC client for Node written in Typescript
 
 ## Get Started
 
 ```
-npm i ladygg
+npm i lady-gg
 ```
 
 ```js
-import { makeRequest } from 'ladygg'
+import { makeRequest } from 'lady-gg'
 
 makeRequest('./helloworld.proto', {
   url: '0.0.0.0:50051',

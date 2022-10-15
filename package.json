@@ -1,5 +1,5 @@
 {
-  "name": "ladygg",
+  "name": "lady-gg",
   "version": "1.0.0",
   "description": "Simple, stupid gRPC client for Node written in Typescript",
   "main": "dist/index.js",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/stepci/ladygg.git"
+    "url": "git+https://github.com/stepci/lady-gg.git"
   },
   "keywords": [
     "grpc",
@@ -19,7 +19,7 @@
   "author": "Mish Ushakov <mish@stepci.com>",
   "license": "MPL-2.0",
   "bugs": {
-    "url": "https://github.com/stepci/ladygg/issues"
+    "url": "https://github.com/stepci/lady-gg/issues"
   },
   "homepage": "https://github.com/stepci",
   "dependencies": {
