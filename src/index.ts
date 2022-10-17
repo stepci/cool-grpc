@@ -3,7 +3,7 @@ import * as protobuf from 'protobufjs'
 import { PeerCertificate } from 'tls'
 
 type ClientConfig = {
-  url: string
+  host: string
   service: string
   method: string
   data: object
@@ -12,9 +12,9 @@ type ClientConfig = {
 
 type ClientConfigOptions = {
   tls?: {
-    rootCerts?: Buffer
-    privateKey?: Buffer
-    certChain?: Buffer
+    rootCerts?: string
+    privateKey?: string
+    certChain?: string
     verifyOptions?: VerifyOptions
   }
 }
@@ -33,7 +33,7 @@ type LookupResult = {
   responseType: string
 }
 
-export async function makeRequest (proto: string, { url, service, method, data, options = {} }: ClientConfig): Promise<object> {
+export async function makeRequest (proto: string, { host, service, method, data, options = {} }: ClientConfig): Promise<object> {
   return new Promise(async (resolve, reject) => {
     const root = await protobuf.load(proto)
     const [packageName, serviceName] = service.split('.')
@@ -52,10 +52,15 @@ export async function makeRequest (proto: string, { url, service, method, data, 
     if (!options.tls) {
       credentials = grpc.credentials.createInsecure()
     } else {
-      credentials = grpc.credentials.createSsl(options.tls.rootCerts, options.tls.privateKey, options.tls.certChain, options.tls.verifyOptions)
+      credentials = grpc.credentials.createSsl(
+        options.tls.rootCerts ? Buffer.from(options.tls.rootCerts) : undefined,
+        options.tls.privateKey ? Buffer.from(options.tls.privateKey) : undefined,
+        options.tls.certChain ? Buffer.from(options.tls.certChain) : undefined,
+        options.tls.verifyOptions
+      )
     }
 
-    const client = new grpc.Client(url, credentials)
+    const client = new grpc.Client(host, credentials)
     client.makeUnaryRequest(`/${packageName}.${serviceName}/${method}`, x => x, x => x, Buffer.from(messageEncoded), (error, message) => {
       if (error) return reject(error)
       if (message) return resolve(responseMessageType.decode(message).toJSON())

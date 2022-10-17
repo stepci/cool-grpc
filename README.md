@@ -12,7 +12,7 @@ npm i lady-gg
 import { makeRequest } from 'lady-gg'
 
 makeRequest('./helloworld.proto', {
-  url: '0.0.0.0:50051',
+  host: '0.0.0.0:50051',
   service: 'helloworld.Greeter',
   method: 'SayHello',
   data: {
