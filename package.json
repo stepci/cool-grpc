@@ -1,6 +1,6 @@
 {
   "name": "lady-gg",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Simple, stupid gRPC client for Node written in Typescript",
   "main": "dist/index.js",
   "scripts": {
