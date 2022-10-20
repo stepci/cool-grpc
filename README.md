@@ -1,15 +1,15 @@
-# lady-gg
+# cool-grpc
 
 Simple, stupid gRPC client for Node written in Typescript
 
 ## Get Started
 
 ```
-npm i lady-gg
+npm i cool-grpc
 ```
 
 ```js
-import { makeRequest } from 'lady-gg'
+import { makeRequest } from 'cool-grpc'
 
 makeRequest('./helloworld.proto', {
   host: '0.0.0.0:50051',
