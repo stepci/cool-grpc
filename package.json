@@ -1,6 +1,6 @@
 {
   "name": "cool-grpc",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Simple, stupid gRPC client for Node written in Typescript",
   "main": "dist/index.js",
   "scripts": {
