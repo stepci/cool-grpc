@@ -33,7 +33,12 @@ type LookupResult = {
   responseType: string
 }
 
-export async function makeRequest (proto: string, { host, service, method, data, options = {} }: ClientConfig): Promise<object> {
+type Response = {
+  message: object
+  size: number
+}
+
+export async function makeRequest (proto: string, { host, service, method, data, options = {} }: ClientConfig): Promise<Response> {
   return new Promise(async (resolve, reject) => {
     const root = await protobuf.load(proto)
     const [packageName, serviceName] = service.split('.')
@@ -63,7 +68,10 @@ export async function makeRequest (proto: string, { host, service, method, data,
     const client = new grpc.Client(host, credentials)
     client.makeUnaryRequest(`/${packageName}.${serviceName}/${method}`, x => x, x => x, Buffer.from(messageEncoded), (error, message) => {
       if (error) return reject(error)
-      if (message) return resolve(responseMessageType.decode(message).toJSON())
+      if (message) return resolve({
+        message: responseMessageType.decode(message).toJSON(),
+        size: message.byteLength
+      })
     })
   })
 }
