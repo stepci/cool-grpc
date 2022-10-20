@@ -18,7 +18,7 @@ makeRequest('./helloworld.proto', {
   data: {
     name: 'world'
   },
-  options: {}
+  tls: {}
 })
 .then(console.log)
 ```

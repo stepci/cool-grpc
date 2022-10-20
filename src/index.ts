@@ -7,16 +7,14 @@ type ClientConfig = {
   service: string
   method: string
   data: object
-  options?: ClientConfigOptions
+  tls?: ClientConfigTLS
 }
 
-type ClientConfigOptions = {
-  tls?: {
-    rootCerts?: string
-    privateKey?: string
-    certChain?: string
-    verifyOptions?: VerifyOptions
-  }
+type ClientConfigTLS = {
+  rootCerts?: string
+  privateKey?: string
+  certChain?: string
+  verifyOptions?: VerifyOptions
 }
 
 type VerifyOptions = {
@@ -33,12 +31,12 @@ type LookupResult = {
   responseType: string
 }
 
-type Response = {
+export type gRPCResponse = {
   message: object
   size: number
 }
 
-export async function makeRequest (proto: string, { host, service, method, data, options = {} }: ClientConfig): Promise<Response> {
+export async function makeRequest (proto: string, { host, service, method, data, tls }: ClientConfig): Promise<gRPCResponse> {
   return new Promise(async (resolve, reject) => {
     const root = await protobuf.load(proto)
     const [packageName, serviceName] = service.split('.')
@@ -54,14 +52,14 @@ export async function makeRequest (proto: string, { host, service, method, data,
     const messageEncoded = requestMessageType.encode(message).finish()
 
     let credentials
-    if (!options.tls) {
+    if (!tls) {
       credentials = grpc.credentials.createInsecure()
     } else {
       credentials = grpc.credentials.createSsl(
-        options.tls.rootCerts ? Buffer.from(options.tls.rootCerts) : undefined,
-        options.tls.privateKey ? Buffer.from(options.tls.privateKey) : undefined,
-        options.tls.certChain ? Buffer.from(options.tls.certChain) : undefined,
-        options.tls.verifyOptions
+        tls.rootCerts ? Buffer.from(tls.rootCerts) : undefined,
+        tls.privateKey ? Buffer.from(tls.privateKey) : undefined,
+        tls.certChain ? Buffer.from(tls.certChain) : undefined,
+        tls.verifyOptions
       )
     }
 
