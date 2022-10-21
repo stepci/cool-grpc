@@ -6,10 +6,15 @@ type ClientConfig = {
   host: string
   service: string
   method: string
-  data: object
+  data: object | object[]
+  metadata?: ClientConfigMetadata
   tls?: ClientConfigTLS
   beforeRequest?: (req: ClientConfig) => void
   afterResponse?: (res: gRPCResponse) => void
+}
+
+type ClientConfigMetadata = {
+  [key: string]: string | Buffer
 }
 
 type ClientConfigTLS = {
@@ -31,28 +36,26 @@ type CheckServerIdentityCallback = (
 type LookupResult = {
   requestType: string
   responseType: string
+  requestStream: boolean
+  responseStream: boolean
 }
 
 export type gRPCResponse = {
-  message: object
+  data: object | object[]
   size: number
 }
 
-export async function makeRequest (proto: string, { beforeRequest, afterResponse, ...clientConfig }: ClientConfig): Promise<gRPCResponse> {
+export async function makeRequest (proto: string | string[], { beforeRequest, afterResponse, ...clientConfig }: ClientConfig): Promise<gRPCResponse> {
   return new Promise(async (resolve, reject) => {
     try {
       const root = await protobuf.load(proto)
       const [packageName, serviceName] = clientConfig.service.split('.')
 
-      const { requestType, responseType } = root.lookup(`${packageName}.${clientConfig.method}`) as unknown as LookupResult
+      const { requestType, responseType, requestStream, responseStream } = root.lookup(`${packageName}.${clientConfig.method}`) as unknown as LookupResult
+      if (requestStream && responseStream) return reject(new Error(`cool-grpc doesn't support bidirectional streams at the moment`))
+
       const requestMessageType = root.lookupType(requestType)
       const responseMessageType = root.lookupType(responseType)
-
-      const verifyError = requestMessageType.verify(clientConfig.data)
-      if (verifyError) return reject(Error(verifyError))
-
-      const message = requestMessageType.create(clientConfig.data)
-      const messageEncoded = requestMessageType.encode(message).finish()
 
       let credentials
       if (!clientConfig.tls) {
@@ -69,18 +72,87 @@ export async function makeRequest (proto: string, { beforeRequest, afterResponse
       const client = new grpc.Client(clientConfig.host, credentials)
       if (beforeRequest) beforeRequest(clientConfig)
 
-      client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, Buffer.from(messageEncoded), (error, message) => {
-        if (error) return reject(error)
-        if (message) {
+      // Unary call
+      if (!requestStream && !responseStream) {
+        const message = requestMessageType.create(clientConfig.data)
+        const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
+
+        client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, (error, message) => {
+          if (error) return reject(error)
+          if (message) {
+            const response = {
+              data: responseMessageType.decode(message).toJSON(),
+              size: message.byteLength
+            }
+
+            if (afterResponse) afterResponse(response)
+            return resolve(response)
+          }
+        })
+      }
+
+      // Client-side streaming
+      if (requestStream) {
+        const metadata = new grpc.Metadata()
+        for (const key in clientConfig.metadata) {
+          metadata.add(key, clientConfig.metadata[key])
+        }
+
+        const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, {}, (error, message) => {
+          if (error) return reject(error)
+          if (message) {
+            const response = {
+              data: responseMessageType.decode(message).toJSON(),
+              size: message.byteLength
+            }
+
+            if (afterResponse) afterResponse(response)
+            return resolve(response)
+          }
+        })
+
+        const data = Array.isArray(clientConfig.data) ? clientConfig.data : [clientConfig.data]
+        data.map((messageData) => {
+          const message = requestMessageType.create(messageData)
+          const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
+          stream.write(messageEncoded)
+        })
+
+        stream.end()
+      }
+
+      // Server-side streaming
+      if (responseStream) {
+        const message = requestMessageType.create(clientConfig.data)
+        const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
+        const metadata = new grpc.Metadata()
+        for (const key in clientConfig.metadata) {
+          metadata.add(key, clientConfig.metadata[key])
+        }
+
+        const stream = client.makeServerStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, {})
+        const messages: object[] = []
+        let totalSize = 0
+
+        stream.on('data', (message: Buffer | undefined) => {
+          if (message) {
+            messages.push(responseMessageType.decode(message).toJSON())
+            totalSize += message.byteLength
+          }
+        })
+
+        stream.on('end', () => {
           const response = {
-            message: responseMessageType.decode(message).toJSON(),
-            size: message.byteLength
+            data: messages,
+            size: totalSize
           }
 
           if (afterResponse) afterResponse(response)
-          return resolve(response)
-        }
-      })
+          resolve(response)
+        })
+
+        stream.on('error', reject)
+      }
     } catch (e) {
       reject(e)
     }
