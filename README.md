@@ -32,8 +32,8 @@ makeRequest(protos, {
     name: 'world'
   },
   tls: {
-    rootCerts: ""
-    privateKey: ""
+    rootCerts: "",
+    privateKey: "",
     certChain: ""
   },
   beforeRequest: (req) => {},

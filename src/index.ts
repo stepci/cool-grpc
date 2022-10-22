@@ -58,15 +58,15 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
       const responseMessageType = root.lookupType(responseType)
 
       let credentials
-      if (!clientConfig.tls) {
-        credentials = grpc.credentials.createInsecure()
-      } else {
+      if (clientConfig.tls && Object.keys(clientConfig.tls).length !== 0) {
         credentials = grpc.credentials.createSsl(
           clientConfig.tls.rootCerts ? Buffer.from(clientConfig.tls.rootCerts) : undefined,
           clientConfig.tls.privateKey ? Buffer.from(clientConfig.tls.privateKey) : undefined,
           clientConfig.tls.certChain ? Buffer.from(clientConfig.tls.certChain) : undefined,
           clientConfig.tls.verifyOptions
         )
+      } else {
+        credentials = grpc.credentials.createInsecure()
       }
 
       const client = new grpc.Client(clientConfig.host, credentials)
@@ -80,7 +80,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
         client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, (error, message) => {
           if (error) return reject(error)
           if (message) {
-            const response = {
+            const response: gRPCResponse = {
               data: responseMessageType.decode(message).toJSON(),
               size: message.byteLength
             }
@@ -101,7 +101,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
         const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, {}, (error, message) => {
           if (error) return reject(error)
           if (message) {
-            const response = {
+            const response: gRPCResponse = {
               data: responseMessageType.decode(message).toJSON(),
               size: message.byteLength
             }
@@ -142,7 +142,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
         })
 
         stream.on('end', () => {
-          const response = {
+          const response: gRPCResponse = {
             data: messages,
             size: totalSize
           }
