@@ -2,7 +2,7 @@ import * as grpc from '@grpc/grpc-js'
 import * as protobuf from 'protobufjs'
 import { PeerCertificate } from 'tls'
 
-type ClientConfig = {
+export type ClientConfig = {
   host: string
   service: string
   method: string
@@ -13,22 +13,22 @@ type ClientConfig = {
   afterResponse?: (res: gRPCResponse) => void
 }
 
-type ClientConfigMetadata = {
+export type ClientConfigMetadata = {
   [key: string]: string | Buffer
 }
 
-type ClientConfigTLS = {
+export type ClientConfigTLS = {
   rootCerts?: string
   privateKey?: string
   certChain?: string
   verifyOptions?: VerifyOptions
 }
 
-type VerifyOptions = {
+export type VerifyOptions = {
   checkServerIdentity?: CheckServerIdentityCallback
 }
 
-type CheckServerIdentityCallback = (
+export type CheckServerIdentityCallback = (
   hostname: string,
   cert: PeerCertificate
 ) => Error | undefined
