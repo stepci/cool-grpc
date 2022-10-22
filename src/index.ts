@@ -2,22 +2,22 @@ import * as grpc from '@grpc/grpc-js'
 import * as protobuf from 'protobufjs'
 import { PeerCertificate } from 'tls'
 
-export type ClientConfig = {
+export type gRPCRequest = {
   host: string
   service: string
   method: string
   data: object | object[]
-  metadata?: ClientConfigMetadata
-  tls?: ClientConfigTLS
-  beforeRequest?: (req: ClientConfig) => void
+  metadata?: gRPCRequestMetadata
+  tls?: gRPCRequestTLS
+  beforeRequest?: (req: gRPCRequest) => void
   afterResponse?: (res: gRPCResponse) => void
 }
 
-export type ClientConfigMetadata = {
+export type gRPCRequestMetadata = {
   [key: string]: string | Buffer
 }
 
-export type ClientConfigTLS = {
+export type gRPCRequestTLS = {
   rootCerts?: string
   privateKey?: string
   certChain?: string
@@ -45,7 +45,7 @@ export type gRPCResponse = {
   size: number
 }
 
-export async function makeRequest (proto: string | string[], { beforeRequest, afterResponse, ...clientConfig }: ClientConfig): Promise<gRPCResponse> {
+export async function makeRequest (proto: string | string[], { beforeRequest, afterResponse, ...clientConfig }: gRPCRequest): Promise<gRPCResponse> {
   return new Promise(async (resolve, reject) => {
     try {
       const root = await protobuf.load(proto)
