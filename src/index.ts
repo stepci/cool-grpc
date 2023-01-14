@@ -49,7 +49,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
   return new Promise(async (resolve, reject) => {
     try {
       const root = await protobuf.load(proto)
-      const [packageName, serviceName] = clientConfig.service.split('.')
+      const [packageName, serviceName] = clientConfig.service.split(/\.(?=[^\.]+$)/)
 
       const { requestType, responseType, requestStream, responseStream } = root.lookup(`${packageName}.${clientConfig.method}`) as unknown as LookupResult
       if (requestStream && responseStream) return reject(new Error(`cool-grpc doesn't support bidirectional streams at the moment`))
