@@ -84,12 +84,17 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
       const client = new grpc.Client(clientConfig.host, credentials)
       if (beforeRequest) beforeRequest(clientConfig)
 
+      const metadata = new grpc.Metadata()
+      for (const key in clientConfig.metadata) {
+        metadata.add(key, clientConfig.metadata[key])
+      }
+
       // Unary call
       if (!requestStream && !responseStream) {
         const message = requestMessageType.create(clientConfig.data)
         const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
 
-        client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, (error, message) => {
+        client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, (error, message) => {
           if (error) return reject(error)
           if (message) {
             const response: gRPCResponse = {
@@ -105,11 +110,6 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
 
       // Client-side streaming
       if (requestStream) {
-        const metadata = new grpc.Metadata()
-        for (const key in clientConfig.metadata) {
-          metadata.add(key, clientConfig.metadata[key])
-        }
-
         const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, {}, (error, message) => {
           if (error) return reject(error)
           if (message) {
@@ -137,10 +137,6 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
       if (responseStream) {
         const message = requestMessageType.create(clientConfig.data)
         const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
-        const metadata = new grpc.Metadata()
-        for (const key in clientConfig.metadata) {
-          metadata.add(key, clientConfig.metadata[key])
-        }
 
         const stream = client.makeServerStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, {})
         const messages: object[] = []
