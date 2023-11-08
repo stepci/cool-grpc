@@ -40,9 +40,9 @@ export type CheckServerIdentityCallback = (
 export type gRPCResponse = {
   data: object | object[]
   size: number,
-  statusCode: number,
-  statusMessage: string,
-  metadata: {
+  statusCode?: number,
+  statusMessage?: string,
+  metadata?: {
     [key: string]: (string | Buffer)[];
   }
 }
@@ -77,7 +77,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
       if (!requestStream && !responseStream) {
         const messageEncoded = requestSerialize(clientConfig.data)
 
-        const response: gRPCResponse = { data: {}, size: 0, statusCode: 0, statusMessage: '', metadata: {} }
+        const response: gRPCResponse = { data: {}, size: 0 }
         const res = client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options, (error, message) => {
           if (error) return reject(error)
           if (message) {
@@ -105,7 +105,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
 
       // Client-side streaming
       if (requestStream) {
-        const response: gRPCResponse = { data: {}, size: 0, statusCode: 0, statusMessage: '', metadata: {} }
+        const response: gRPCResponse = { data: {}, size: 0 }
         const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, options, (error, message) => {
           if (error) return reject(error)
           if (message) {
@@ -143,7 +143,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
       if (responseStream) {
         const messageEncoded = requestSerialize(clientConfig.data)
 
-        const response: gRPCResponse = { data: {}, size: 0, statusCode: 0, statusMessage: '', metadata: {} }
+        const response: gRPCResponse = { data: {}, size: 0 }
         const stream = client.makeServerStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options)
         const messages: object[] = []
         let totalSize = 0
