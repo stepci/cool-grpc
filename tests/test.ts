@@ -1,21 +1,14 @@
-import { makeRequest } from '../src'
+import { makeRequest } from '../src/index'
 
-makeRequest('./tests/route_guide.proto', {
+makeRequest('./tests/helloworld.proto', {
   host: 'localhost:50051',
-  service: 'routeguide.RouteGuide',
-  method: 'ListFeatures',
+  service: 'helloworld.Greeter',
+  method: 'SayHello',
   metadata: {},
   data: {
-    lo: {
-      latitude: 407838351,
-      longitude: -746143763
-    },
-    hi: {
-      latitude: 410248224,
-      longitude: -747127767
-    }
+    name: 'hello'
   },
   beforeRequest: (req) => {},
-  afterResponse: (res) => {}
+  afterResponse: (res) => {},
 })
 .then(console.log)

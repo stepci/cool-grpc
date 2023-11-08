@@ -1,6 +1,6 @@
 {
   "name": "cool-grpc",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "description": "Simple, stupid gRPC client for Node written in TypeScript",
   "main": "dist/index.js",
   "scripts": {
@@ -24,7 +24,7 @@
   "homepage": "https://github.com/stepci",
   "dependencies": {
     "@grpc/grpc-js": "^1.7.1",
-    "protobufjs": "^7.1.2"
+    "@grpc/proto-loader": "^0.7.10"
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.3",

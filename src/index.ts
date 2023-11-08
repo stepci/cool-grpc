@@ -1,6 +1,7 @@
 import * as grpc from '@grpc/grpc-js'
-import * as protobuf from 'protobufjs'
+import * as protoLoader from '@grpc/proto-loader'
 import { PeerCertificate } from 'tls'
+import getCredentials from './credentials'
 
 export type gRPCRequest = {
   host: string
@@ -11,6 +12,9 @@ export type gRPCRequest = {
   tls?: gRPCRequestTLS
   beforeRequest?: (req: gRPCRequest) => void
   afterResponse?: (res: gRPCResponse) => void
+  loaderOptions?: protoLoader.Options
+  signal?: AbortSignal
+  options?: grpc.CallOptions
 }
 
 export type gRPCRequestMetadata = {
@@ -33,54 +37,34 @@ export type CheckServerIdentityCallback = (
   cert: PeerCertificate
 ) => Error | undefined
 
-type LookupResult = {
-  requestType: string
-  responseType: string
-  requestStream: boolean
-  responseStream: boolean
-}
-
 export type gRPCResponse = {
-  data: object | object[]
-  size: number
+  data?: object | object[]
+  size?: number,
+  statusCode?: number,
+  statusMessage?: string,
+  metadata?: {
+    [key: string]: (string | Buffer)[];
+  }
 }
 
-export async function makeRequest (proto: string | string[], { beforeRequest, afterResponse, ...clientConfig }: gRPCRequest): Promise<gRPCResponse> {
+const defaultLoaderOptions = {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true
+}
+
+export async function makeRequest (proto: string | string[], { beforeRequest, afterResponse, loaderOptions = defaultLoaderOptions, options = {}, ...clientConfig }: gRPCRequest): Promise<gRPCResponse> {
   return new Promise(async (resolve, reject) => {
     try {
-      const root = await protobuf.load(proto)
+      const packageDefinition = await protoLoader.load(proto, loaderOptions) as any
       const [packageName, serviceName] = clientConfig.service.split(/\.(?=[^\.]+$)/)
 
-      const { requestType, responseType, requestStream, responseStream } = root.lookup(`${packageName}.${clientConfig.method}`) as unknown as LookupResult
+      const { requestSerialize, responseDeserialize, requestStream, responseStream } = packageDefinition[`${packageName}.${serviceName}`][clientConfig.method]
       if (requestStream && responseStream) return reject(new Error(`cool-grpc doesn't support bidirectional streams at the moment`))
 
-      const requestMessageType = root.lookupType(requestType)
-      const responseMessageType = root.lookupType(responseType)
-
-      let credentials
-      if (clientConfig.tls && Object.keys(clientConfig.tls).length !== 0) {
-        credentials = grpc.credentials.createSsl(
-          clientConfig.tls.rootCerts
-            ? Buffer.isBuffer(clientConfig.tls.rootCerts)
-              ? clientConfig.tls.rootCerts
-              : Buffer.from(clientConfig.tls.rootCerts)
-            : undefined,
-          clientConfig.tls.privateKey
-            ? Buffer.isBuffer(clientConfig.tls.privateKey)
-              ? clientConfig.tls.privateKey
-              : Buffer.from(clientConfig.tls.privateKey)
-            : undefined,
-          clientConfig.tls.certChain
-            ? Buffer.isBuffer(clientConfig.tls.certChain)
-              ? clientConfig.tls.certChain
-              : Buffer.from(clientConfig.tls.certChain)
-            : undefined,
-          clientConfig.tls.verifyOptions
-        )
-      } else {
-        credentials = grpc.credentials.createInsecure()
-      }
-
+      const credentials = getCredentials(clientConfig)
       const client = new grpc.Client(clientConfig.host, credentials)
       if (beforeRequest) beforeRequest(clientConfig)
 
@@ -91,32 +75,42 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
 
       // Unary call
       if (!requestStream && !responseStream) {
-        const message = requestMessageType.create(clientConfig.data)
-        const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
+        const messageEncoded = requestSerialize(clientConfig.data)
 
-        client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, (error, message) => {
+        const response: gRPCResponse = {}
+        const res = client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options, (error, message) => {
           if (error) return reject(error)
           if (message) {
-            const response: gRPCResponse = {
-              data: responseMessageType.decode(message).toJSON(),
-              size: message.byteLength
-            }
+            response.data = responseDeserialize(message)
+            response.size = message.byteLength
 
             if (afterResponse) afterResponse(response)
             return resolve(response)
           }
         })
+
+        res.on('status', status => {
+          response.statusCode = status.code
+          response.statusMessage = status.details
+        })
+
+        res.on('metadata', metadata => {
+          response.metadata = metadata.toJSON()
+        })
+
+        clientConfig.signal?.addEventListener('abort', () => {
+          res.cancel()
+        })
       }
 
       // Client-side streaming
       if (requestStream) {
-        const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, {}, (error, message) => {
+        const response: gRPCResponse = {}
+        const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, options, (error, message) => {
           if (error) return reject(error)
           if (message) {
-            const response: gRPCResponse = {
-              data: responseMessageType.decode(message).toJSON(),
-              size: message.byteLength
-            }
+            response.data = responseDeserialize(message),
+            response.size = message.byteLength
 
             if (afterResponse) afterResponse(response)
             return resolve(response)
@@ -125,41 +119,64 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
 
         const data = Array.isArray(clientConfig.data) ? clientConfig.data : [clientConfig.data]
         data.map((messageData) => {
-          const message = requestMessageType.create(messageData)
-          const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
+          const messageEncoded = requestSerialize(messageData)
           stream.write(messageEncoded)
         })
 
+        stream.on('status', status => {
+          response.statusCode = status.code
+          response.statusMessage = status.details
+        })
+
+        stream.on('metadata', metadata => {
+          response.metadata = metadata.toJSON()
+        })
+
         stream.end()
+
+        clientConfig.signal?.addEventListener('abort', () => {
+          stream.cancel()
+        })
       }
 
       // Server-side streaming
       if (responseStream) {
-        const message = requestMessageType.create(clientConfig.data)
-        const messageEncoded = Buffer.from(requestMessageType.encode(message).finish())
+        const messageEncoded = requestSerialize(clientConfig.data)
 
-        const stream = client.makeServerStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, {})
+        const response: gRPCResponse = {}
+        const stream = client.makeServerStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options)
         const messages: object[] = []
         let totalSize = 0
 
         stream.on('data', (message: Buffer | undefined) => {
           if (message) {
-            messages.push(responseMessageType.decode(message).toJSON())
+            messages.push(responseDeserialize(message))
             totalSize += message.byteLength
           }
         })
 
         stream.on('end', () => {
-          const response: gRPCResponse = {
-            data: messages,
-            size: totalSize
-          }
+          response.data = messages
+          response.size = totalSize
 
           if (afterResponse) afterResponse(response)
           resolve(response)
         })
 
         stream.on('error', reject)
+
+        stream.on('status', status => {
+          response.statusCode = status.code
+          response.statusMessage = status.details
+        })
+
+        stream.on('metadata', metadata => {
+          response.metadata = metadata.toJSON()
+        })
+
+        clientConfig.signal?.addEventListener('abort', () => {
+          stream.cancel()
+        })
       }
     } catch (e) {
       reject(e)
