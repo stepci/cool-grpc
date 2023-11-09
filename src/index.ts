@@ -7,7 +7,7 @@ export type gRPCRequest = {
   host: string
   service: string
   method: string
-  data: object | object[]
+  data?: object | object[]
   metadata?: gRPCRequestMetadata
   tls?: gRPCRequestTLS
   beforeRequest?: (req: gRPCRequest) => void
@@ -59,9 +59,8 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
   return new Promise(async (resolve, reject) => {
     try {
       const packageDefinition = await protoLoader.load(proto, loaderOptions) as any
-      const [packageName, serviceName] = clientConfig.service.split(/\.(?=[^\.]+$)/)
 
-      const { requestSerialize, responseDeserialize, requestStream, responseStream } = packageDefinition[`${packageName}.${serviceName}`][clientConfig.method]
+      const { requestSerialize, responseDeserialize, requestStream, responseStream } = packageDefinition[clientConfig.service][clientConfig.method]
       if (requestStream && responseStream) return reject(new Error(`cool-grpc doesn't support bidirectional streams at the moment`))
 
       const credentials = getCredentials(clientConfig)
@@ -78,7 +77,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
         const messageEncoded = requestSerialize(clientConfig.data)
 
         const response: gRPCResponse = { data: {}, size: 0 }
-        const res = client.makeUnaryRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options, (error, message) => {
+        const res = client.makeUnaryRequest(`/${clientConfig.service}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options, (error, message) => {
           if (error) return reject(error)
           if (message) {
             response.data = responseDeserialize(message)
@@ -106,7 +105,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
       // Client-side streaming
       if (requestStream) {
         const response: gRPCResponse = { data: {}, size: 0 }
-        const stream = client.makeClientStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, options, (error, message) => {
+        const stream = client.makeClientStreamRequest(`/${clientConfig.service}/${clientConfig.method}`, x => x as Buffer, x => x, metadata, options, (error, message) => {
           if (error) return reject(error)
           if (message) {
             response.data = responseDeserialize(message),
@@ -144,7 +143,7 @@ export async function makeRequest (proto: string | string[], { beforeRequest, af
         const messageEncoded = requestSerialize(clientConfig.data)
 
         const response: gRPCResponse = { data: {}, size: 0 }
-        const stream = client.makeServerStreamRequest(`/${packageName}.${serviceName}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options)
+        const stream = client.makeServerStreamRequest(`/${clientConfig.service}/${clientConfig.method}`, x => x, x => x, messageEncoded, metadata, options)
         const messages: object[] = []
         let totalSize = 0
 
